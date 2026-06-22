@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toning Tracker Pro</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; max-width: 500px; margin: auto; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { padding: 10px; cursor: pointer; background: #ddd; border: none; border-radius: 5px; flex: 1; }
+        .tab-btn.active { background: #4a7c59; color: white; }
+        .content { display: none; }
+        .content.active { display: block; }
+        
+        /* Checklist Styles */
+        .task { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input[type="checkbox"] { transform: scale(1.5); margin-right: 15px; }
+        .done { text-decoration: line-through; opacity: 0.6; }
+
+        /* Notification Controls */
+        .notify-btn { width: 100%; padding: 10px; background: #4a7c59; color: white; border: none; border-radius: 5px; margin-bottom: 20px; cursor: pointer; }
+        
+        /* Reset Button */
+        .reset-btn { width: 100%; padding: 10px; background: #c0392b; color: white; border: none; border-radius: 5px; margin-top: 20px; cursor: pointer; }
+
+        /* Chart Styles */
+        .chart-container { background: white; padding: 20px; border-radius: 8px; }
+        .bar-wrapper { margin-bottom: 20px; }
+        .bar-header { display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 5px; font-weight: bold; }
+        .bar-bg { background: #eee; height: 20px; border-radius: 10px; overflow: hidden; }
+        .bar-fill { background: #4a7c59; height: 100%; width: 0%; transition: width 0.5s; }
+    </style>
+</head>
+<body>
+
+    <h2>Toning Tracker</h2>
+    
+    <button class="notify-btn" onclick="requestPermission()">Enable Notifications</button>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('daily')">Daily Checklist</button>
+        <button class="tab-btn" onclick="showTab('weekly')">Weekly Report</button>
+    </div>
+
+    <div id="daily" class="content active"></div>
+    <div id="weekly" class="content">
+        <div class="chart-container" id="chart"></div>
+        <button class="reset-btn" onclick="resetProgress()">Reset Weekly Progress</button>
+    </div>
+
+    <script>
+        const tasks = [
+            { id: 0, time: "5:00 AM", action: "Hydration" },
+            { id: 1, time: "5:15 AM", action: "Breakfast" },
+            { id: 2, time: "6:00 AM", action: "Commute Sip" },
+            { id: 3, time: "8:30 AM", action: "Classroom Hydration" },
+            { id: 4, time: "10:00 AM", action: "College Break Snack" },
+            { id: 5, time: "11:30 AM", action: "Classroom Hydration" },
+            { id: 6, time: "1:30 PM", action: "Commute Sip" },
+            { id: 7, time: "2:45 PM", action: "Late Lunch" },
+            { id: 8, time: "4:30 PM", action: "Study Time Hydration" },
+            { id: 9, time: "6:00 PM", action: "Evening Snack" },
+            { id: 10, time: "7:15 PM", action: "Pre-Dinner Hydration" },
+            { id: 11, time: "8:15 PM", action: "Light Dinner" },
+            { id: 12, time: "9:00 PM", action: "Final Hydration" },
+            { id: 13, time: "9:30 PM", action: "Sleep" }
+        ];
+
+        // Permission Request
+        function requestPermission() {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') alert('Notifications Enabled!');
+            });
+        }
+
+        // Notification Scheduler
+        setInterval(() => {
+            const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            tasks.forEach(t => {
+                if (t.time === now) {
+                    new Notification("Toning Reminder", { body: `Time for: ${t.action}` });
+                }
+            });
+        }, 60000); 
+
+        function showTab(tab) {
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            event.target.classList.add('active');
+            if(tab === 'weekly') updateChart();
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const dailyContainer = document.getElementById('daily');
+        
+        tasks.forEach(t => {
+            const isChecked = localStorage.getItem(`${today}-${t.id}`) === 'true';
+            const div = document.createElement('div');
+            div.className = 'task';
+            div.innerHTML = `
+                <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggle(${t.id})">
+                <span id="label-${t.id}" class="${isChecked ? 'done' : ''}">${t.time} | ${t.action}</span>
+            `;
+            dailyContainer.appendChild(div);
+        });
+
+        function toggle(id) {
+            const isChecked = event.target.checked;
+            localStorage.setItem(`${today}-${id}`, isChecked);
+            document.getElementById(`label-${id}`).classList.toggle('done', isChecked);
+        }
+
+        // Reset Function
+        function resetProgress() {
+            if (confirm("Are you sure you want to clear all your tracked progress?")) {
+                for (let key in localStorage) {
+                    // This identifies and removes only the task keys (format YYYY-MM-DD-ID)
+                    if (key.match(/^\d{4}-\d{2}-\d{2}-\d+/)) {
+                        localStorage.removeItem(key);
+                    }
+                }
+                location.reload();
+            }
+        }
+
+        function updateChart() {
+            const chart = document.getElementById('chart');
+            chart.innerHTML = '<h3>Last 7 Days Progress</h3>';
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateKey = d.toISOString().split('T')[0];
+                let count = 0;
+                tasks.forEach(t => {
+                    if (localStorage.getItem(`${dateKey}-${t.id}`) === 'true') count++;
+                });
+                const percent = Math.round((count / tasks.length) * 100);
+                chart.innerHTML += `
+                    <div class="bar-wrapper">
+                        <div class="bar-header">
+                            <span>${d.toLocaleDateString('en-US', {weekday: 'short'})}</span>
+                            <span>${count}/${tasks.length} (${percent}%)</span>
+                        </div>
+                        <div class="bar-bg"><div class="bar-fill" style="width: ${percent}%"></div></div>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
